@@ -1,0 +1,50 @@
+---
+- name: Install Apache Maven
+  hosts: nodeserver
+  become: true
+
+  vars:
+    maven_download_url: https://downloads.apache.org/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
+  
+  tasks:
+   - name: apache directory
+     file: 
+      path: "/opt/apache-maven"
+      state: directory
+      mode: '0775'
+      owner: ansibleadmin
+      group: ansibleadmin
+
+   - name: download apache maven
+     get_url:
+       url: "{{maven_download_url }}"
+       dest: "/temp/apache-maven-3.8.4-bin.tar.gz"
+       mode: '0644'
+
+   - name: extract apache maven
+     unarchive:
+       src: "/temp/apache-maven-3.8.4-bin.tar.gz"
+       dest: "/opt/apache-maven"
+       remote_src: yes
+       mode: '0775'
+       owner: ansibleadmin
+       group: ansibleadmin
+       creates: "/opt/apache-maven/bin/mvn"
+
+   - name: environment variables
+     lineinfile:
+       path: /etc/profile.d/maven.sh
+       line: |
+         export M2_HOME="{{ maven_install_dir }}"
+         export MAVEN_HOME="{{ maven_install_dir }}"
+         export PATH="{{ maven_install_dir }}/bin:$PATH"
+       create: yes
+       mode: '0644' 
+   - name: Load Maven environment variables
+     shell: |
+       source /etc/profile.d/maven.sh
+     args:
+       executable: /bin/bash
+
+   - name: Verify Maven installation
+     command: mvn --version

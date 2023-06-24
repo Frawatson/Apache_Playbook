@@ -1,0 +1,92 @@
+---
+- name: Download Apache Tomcat
+  hosts: nodeserver
+  become: true
+
+  vars:
+    tomcat_download_url: https://dlcdn.apache.org/tomcat/tomcat-8/v8.5.90/bin/apache-tomcat-8.5.90.zip
+    
+  tasks:
+   - name: Install JDK
+     become: yes
+     apt:
+      name: openjdk-17-jre
+      state: present
+  
+   - name: validate if Java is available 
+     shell: 
+      java -version
+     
+   - name: Create the group
+     become: yes
+     group: 
+      name: tomcat
+      state: present
+
+   - name: Create the user
+     become: yes
+     user:
+        name: tomcat
+        state: present
+
+   - name: Create a Directory /opt/tomcat
+     become: yes
+     file:
+       path: /opt/tomcat
+       state: directory
+       mode: 0755
+       owner: tomcat
+       group: tomcat
+
+   - name: Download Tomcat using unarchive
+     become: yes
+     unarchive:
+       src: "{{tomcat_download_url}}"
+       dest: /opt/tomcat
+       mode: 0755
+       remote_src: yes
+       group: tomcat
+       owner: tomcat
+    
+   - name: Move files to the /opt/tomcat directory
+     become: yes
+     become_user: tomcat
+     shell: "mv /opt/tomcat/apache*/* /opt/tomcat"
+
+   - name: Creating a service file
+     become: yes
+     copy: 
+      content: |-
+        [Unit]
+        Description=Apache Tomcat Web Application Container
+        After=network.target
+
+        [Service]
+        Type=forking
+        User=tomcat
+        Environment="CATALINA_PID=/opt/tomcat/logs/tomcat.pid"
+        Environment="CATALINA_BASE=/opt/tomcat"
+        Environment="CATALINA_HOME=/opt/tomcat"
+        Environment="CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC"
+
+        ExecStart=/opt/tomcat/bin/startup.sh
+        ExecStop=/opt/tomcat/bin/shutdown.sh
+        Restart=on-abnormal
+
+        [Install]
+        WantedBy=multi-user.target
+      dest: /etc/systemd/system/tomcat.service
+
+   - name: Reload daemon
+     become: yes
+     systemd:
+        daemon-reload: yes
+
+   - name: Enable the tomcat service and start
+     become: yes
+     systemd:
+        name: tomcat
+        enabled: yes
+        state: started
+
+  
